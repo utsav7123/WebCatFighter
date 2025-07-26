@@ -111,12 +111,16 @@ function initializeRealMultiplayer() {
     
     socket.on('connect', () => {
         console.log('Connected to server');
+        console.log('Socket ID:', socket.id);
     });
     
     socket.on('roomCreated', (data) => {
+        console.log('Room created:', data);
         roomCode = data.roomCode;
         playerRole = data.role;
         isOnline = true;
+        document.getElementById('roomCode').value = roomCode;
+        document.getElementById('roomCode').placeholder = 'Your room code';
         showRoomStatus(`Room created! Code: ${roomCode}\nWaiting for player to join...`, 'connected');
         
         // Wait for another player
@@ -129,6 +133,7 @@ function initializeRealMultiplayer() {
     });
     
     socket.on('roomJoined', (data) => {
+        console.log('Room joined:', data);
         roomCode = data.roomCode;
         playerRole = data.role;
         isOnline = true;
@@ -136,11 +141,22 @@ function initializeRealMultiplayer() {
     });
     
     socket.on('gameStart', () => {
+        console.log('Game starting!');
         startOnlineGame();
     });
     
     socket.on('roomError', (message) => {
+        console.log('Room error:', message);
         showRoomStatus(`Error: ${message}`, 'error');
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+    });
+    
+    socket.on('connect_error', (error) => {
+        console.log('Connection error:', error);
+        showRoomStatus('Failed to connect to server', 'error');
     });
     
     socket.on('opponentUpdate', (data) => {
@@ -673,6 +689,7 @@ function restartGame() {
 
 // Online Multiplayer Functions
 async function createRoom() {
+    console.log('Creating room...');
     document.getElementById('roomTitle').textContent = 'Create Room';
     document.getElementById('roomCode').value = '';
     document.getElementById('roomCode').disabled = true;
@@ -682,9 +699,11 @@ async function createRoom() {
     // Use real server (Railway)
     if (typeof SERVER_URL !== 'undefined' && initializeRealMultiplayer()) {
         showRoomStatus('Creating room...', 'waiting');
+        console.log('Emitting createRoom event');
         socket.emit('createRoom');
         return;
     } else {
+        console.log('Failed to initialize multiplayer');
         showRoomStatus('Failed to connect to server. Please try again.', 'error');
     }
 }
@@ -758,13 +777,16 @@ async function initializeOnlineGame(action, code = null) {
         playerRole = 'host';
         
     } else if (action === 'join') {
+        console.log('Joining room with code:', code);
         // Use real server (Railway)
         if (typeof SERVER_URL !== 'undefined' && initializeRealMultiplayer()) {
             showRoomStatus('Joining room...', 'waiting');
+            console.log('Emitting joinRoom event with code:', code);
             socket.emit('joinRoom', code);
             roomCode = code;
             return;
         } else {
+            console.log('Failed to initialize multiplayer for joining');
             showRoomStatus('Failed to connect to server. Please try again.', 'error');
         }
     }
