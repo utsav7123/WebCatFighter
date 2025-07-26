@@ -38,78 +38,56 @@ let roomCode = null;
 let playerRole = null; // 'host' or 'guest'
 let onlineOpponent = null;
 
-// Simple room storage using a cloud-based approach
-// Using JSONBin.io as a simple shared storage (free service)
+// IMPORTANT: This is a demo version
+// For real cross-device multiplayer, you need the server.js file running on a hosting service
+// For now, this simulates the room system for local testing
+
 let cloudServer = {
-    baseUrl: 'https://api.jsonbin.io/v3/b',
-    
+    // Demo mode - simulates room creation for local testing
     async createRoom(code) {
-        try {
-            const roomData = {
-                [code]: {
-                    host: true,
-                    guest: false,
-                    hostReady: true,
-                    guestReady: false,
-                    created: Date.now()
-                }
-            };
-            
-            // For now, simulate cloud storage with localStorage + timestamp
-            // In production, you'd use a real API
-            const allRooms = this.getAllRooms();
-            allRooms[code] = roomData[code];
-            localStorage.setItem('catfighter_cloud_rooms', JSON.stringify(allRooms));
-            return true;
-        } catch (e) {
-            console.log('Room creation failed:', e);
-            return false;
-        }
+        const roomData = {
+            code: code,
+            host: true,
+            guest: false,
+            hostReady: true,
+            guestReady: false,
+            created: Date.now(),
+            expires: Date.now() + (60 * 60 * 1000) // 1 hour
+        };
+        
+        localStorage.setItem(`catfighter_room_${code}`, JSON.stringify(roomData));
+        return true;
     },
     
     async joinRoom(code) {
-        try {
-            const allRooms = this.getAllRooms();
-            const room = allRooms[code];
+        // In demo mode, any valid 6-character code will "work"
+        if (code && code.length === 6) {
+            const roomData = {
+                code: code,
+                host: true,
+                guest: true,
+                hostReady: true,
+                guestReady: true,
+                created: Date.now(),
+                expires: Date.now() + (60 * 60 * 1000)
+            };
             
-            if (!room) return { success: false, reason: 'not_found' };
-            if (room.guest) return { success: false, reason: 'full' };
-            
-            room.guest = true;
-            room.guestReady = true;
-            allRooms[code] = room;
-            localStorage.setItem('catfighter_cloud_rooms', JSON.stringify(allRooms));
-            
+            localStorage.setItem(`catfighter_room_${code}`, JSON.stringify(roomData));
             return { success: true };
-        } catch (e) {
-            console.log('Room join failed:', e);
-            return { success: false, reason: 'error' };
         }
+        
+        return { success: false, reason: 'not_found' };
     },
     
-    getRoomStatus(code) {
-        const allRooms = this.getAllRooms();
-        return allRooms[code] || null;
-    },
-    
-    getAllRooms() {
-        try {
-            const stored = localStorage.getItem('catfighter_cloud_rooms');
-            const rooms = stored ? JSON.parse(stored) : {};
-            
-            // Clean up old rooms (older than 1 hour)
-            const oneHourAgo = Date.now() - (60 * 60 * 1000);
-            Object.keys(rooms).forEach(code => {
-                if (rooms[code].created < oneHourAgo) {
-                    delete rooms[code];
-                }
-            });
-            
-            localStorage.setItem('catfighter_cloud_rooms', JSON.stringify(rooms));
-            return rooms;
-        } catch (e) {
-            return {};
+    async getRoomStatus(code) {
+        const stored = localStorage.getItem(`catfighter_room_${code}`);
+        if (stored) {
+            const room = JSON.parse(stored);
+            if (Date.now() <= room.expires) {
+                return room;
+            }
         }
+        return null;
     }
 };
 
@@ -617,35 +595,34 @@ async function createRoom() {
     document.getElementById('roomCode').placeholder = 'Your room code';
     document.getElementById('roomUI').style.display = 'flex';
     
-    // Show loading status
-    showRoomStatus('Creating room...', 'waiting');
+    // Show demo warning
+    showRoomStatus(`DEMO MODE: Room created! Code: ${roomCode}\n\nNOTE: For real cross-device multiplayer, you need to deploy the server.js file to a hosting service like Railway, Render, or Heroku.`, 'connected');
     
     // Store the room in cloud server
     const success = await cloudServer.createRoom(roomCode);
     
     if (success) {
-        // Show immediate status
-        showRoomStatus(`Room created! Share code: ${roomCode}`, 'connected');
-        
         // Change button text to indicate waiting
         const connectBtn = document.querySelector('#roomUI button');
-        connectBtn.textContent = 'Waiting for Player...';
-        connectBtn.disabled = true;
+        connectBtn.textContent = 'Start Demo Game';
+        connectBtn.disabled = false;
         
         // Set player role
         playerRole = 'host';
         isOnline = true;
         
-        // Actually wait for a real player - check periodically
-        waitForPlayer();
+        // In demo mode, allow immediate start
+        connectBtn.onclick = () => {
+            startOnlineGame();
+        };
     } else {
         showRoomStatus('Failed to create room. Please try again.', 'error');
     }
 }
 
-function waitForPlayer() {
-    const checkForPlayer = setInterval(() => {
-        const room = cloudServer.getRoomStatus(roomCode);
+async function waitForPlayer() {
+    const checkForPlayer = setInterval(async () => {
+        const room = await cloudServer.getRoomStatus(roomCode);
         if (room && room.guest && room.guestReady) {
             clearInterval(checkForPlayer);
             showRoomStatus('Player joined! Starting game...', 'connected');
@@ -653,15 +630,12 @@ function waitForPlayer() {
                 startOnlineGame();
             }, 2000);
         }
-    }, 2000); // Check every 2 seconds
+    }, 3000); // Check every 3 seconds
     
     // Stop checking after 5 minutes (timeout)
     setTimeout(() => {
         clearInterval(checkForPlayer);
-        const room = cloudServer.getRoomStatus(roomCode);
-        if (room && !room.guest) {
-            showRoomStatus('Room timed out. No player joined.', 'error');
-        }
+        showRoomStatus('Room timed out. No player joined.', 'error');
     }, 300000); // 5 minutes
 }
 
@@ -715,14 +689,14 @@ async function initializeOnlineGame(action, code = null) {
         playerRole = 'host';
         
     } else if (action === 'join') {
-        showRoomStatus('Joining room...', 'waiting');
+        showRoomStatus('DEMO MODE: Joining room...', 'waiting');
         
         // Try to join the room using cloud server
         const result = await cloudServer.joinRoom(code);
         
         if (!result.success) {
             if (result.reason === 'not_found') {
-                showRoomStatus('Room not found! Check the code and try again.', 'error');
+                showRoomStatus('In DEMO MODE, any 6-character code works.\n\nFor real cross-device play, deploy the server.js file!', 'error');
             } else if (result.reason === 'full') {
                 showRoomStatus('Room is full! Try a different room.', 'error');
             } else {
@@ -736,7 +710,7 @@ async function initializeOnlineGame(action, code = null) {
         
         // Simulate connection delay
         setTimeout(() => {
-            showRoomStatus('Connected! Starting game...', 'connected');
+            showRoomStatus('DEMO: Connected! Starting game...', 'connected');
             
             // Start the game
             setTimeout(() => {
