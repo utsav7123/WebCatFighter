@@ -178,6 +178,7 @@ function initializeRealMultiplayer() {
         // Handle when the opponent tells us our health was reduced
         if (gameState === "online") {
             const myPlayer = playerRole === 'host' ? p1 : p2;
+            console.log(`[${playerRole}] Receiving opponentHealthUpdate - My health changed from ${myPlayer.health} to ${data.health}`);
             myPlayer.health = data.health;
             myPlayer.dead = data.dead || false;
             if (myPlayer.dead) {
@@ -189,6 +190,7 @@ function initializeRealMultiplayer() {
     socket.on('myHealthUpdate', (data) => {
         // Handle when the opponent's health changes (they healed or got hurt)
         if (gameState === "online" && onlineOpponent) {
+            console.log(`[${playerRole}] Receiving myHealthUpdate - Opponent health changed from ${onlineOpponent.health} to ${data.health}`);
             onlineOpponent.health = data.health;
             onlineOpponent.dead = data.dead || false;
         }
@@ -341,7 +343,9 @@ class Fighter {
         };
 
         if (this.collideRect(attackRect, opponent.rect) && !opponent.dead) {
+            const oldHealth = opponent.health;
             opponent.health -= dmg;
+            const newHealth = opponent.health;
             opponent.hurt_timer = 18;
             opponent.frame = 3;
             opponent.rect.x += this.facing * 10;
@@ -350,6 +354,7 @@ class Fighter {
             
             // Send opponent's health update in multiplayer when we hit them
             if (gameState === "online" && socket) {
+                console.log(`[${playerRole}] I hit opponent! Their health: ${oldHealth} -> ${newHealth}`);
                 socket.emit('opponentHealthUpdate', {
                     health: opponent.health,
                     dead: opponent.health <= 0
