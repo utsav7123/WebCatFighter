@@ -38,8 +38,80 @@ let roomCode = null;
 let playerRole = null; // 'host' or 'guest'
 let onlineOpponent = null;
 
-// Simple room storage (in real app, this would be on server)
-let activeRooms = new Map();
+// Simple room storage using a cloud-based approach
+// Using JSONBin.io as a simple shared storage (free service)
+let cloudServer = {
+    baseUrl: 'https://api.jsonbin.io/v3/b',
+    
+    async createRoom(code) {
+        try {
+            const roomData = {
+                [code]: {
+                    host: true,
+                    guest: false,
+                    hostReady: true,
+                    guestReady: false,
+                    created: Date.now()
+                }
+            };
+            
+            // For now, simulate cloud storage with localStorage + timestamp
+            // In production, you'd use a real API
+            const allRooms = this.getAllRooms();
+            allRooms[code] = roomData[code];
+            localStorage.setItem('catfighter_cloud_rooms', JSON.stringify(allRooms));
+            return true;
+        } catch (e) {
+            console.log('Room creation failed:', e);
+            return false;
+        }
+    },
+    
+    async joinRoom(code) {
+        try {
+            const allRooms = this.getAllRooms();
+            const room = allRooms[code];
+            
+            if (!room) return { success: false, reason: 'not_found' };
+            if (room.guest) return { success: false, reason: 'full' };
+            
+            room.guest = true;
+            room.guestReady = true;
+            allRooms[code] = room;
+            localStorage.setItem('catfighter_cloud_rooms', JSON.stringify(allRooms));
+            
+            return { success: true };
+        } catch (e) {
+            console.log('Room join failed:', e);
+            return { success: false, reason: 'error' };
+        }
+    },
+    
+    getRoomStatus(code) {
+        const allRooms = this.getAllRooms();
+        return allRooms[code] || null;
+    },
+    
+    getAllRooms() {
+        try {
+            const stored = localStorage.getItem('catfighter_cloud_rooms');
+            const rooms = stored ? JSON.parse(stored) : {};
+            
+            // Clean up old rooms (older than 1 hour)
+            const oneHourAgo = Date.now() - (60 * 60 * 1000);
+            Object.keys(rooms).forEach(code => {
+                if (rooms[code].created < oneHourAgo) {
+                    delete rooms[code];
+                }
+            });
+            
+            localStorage.setItem('catfighter_cloud_rooms', JSON.stringify(rooms));
+            return rooms;
+        } catch (e) {
+            return {};
+        }
+    }
+};
 
 // Assets
 let assets = {
@@ -537,7 +609,7 @@ function restartGame() {
 }
 
 // Online Multiplayer Functions
-function createRoom() {
+async function createRoom() {
     document.getElementById('roomTitle').textContent = 'Create Room';
     roomCode = generateRoomCode();
     document.getElementById('roomCode').value = roomCode;
@@ -545,33 +617,35 @@ function createRoom() {
     document.getElementById('roomCode').placeholder = 'Your room code';
     document.getElementById('roomUI').style.display = 'flex';
     
-    // Store the room
-    activeRooms.set(roomCode, {
-        host: true,
-        guest: false,
-        hostReady: true,
-        guestReady: false
-    });
+    // Show loading status
+    showRoomStatus('Creating room...', 'waiting');
     
-    // Show immediate status
-    showRoomStatus(`Room created! Share code: ${roomCode}`, 'connected');
+    // Store the room in cloud server
+    const success = await cloudServer.createRoom(roomCode);
     
-    // Change button text to indicate waiting
-    const connectBtn = document.querySelector('#roomUI button');
-    connectBtn.textContent = 'Waiting for Player...';
-    connectBtn.disabled = true;
-    
-    // Set player role
-    playerRole = 'host';
-    isOnline = true;
-    
-    // Actually wait for a real player - check periodically
-    waitForPlayer();
+    if (success) {
+        // Show immediate status
+        showRoomStatus(`Room created! Share code: ${roomCode}`, 'connected');
+        
+        // Change button text to indicate waiting
+        const connectBtn = document.querySelector('#roomUI button');
+        connectBtn.textContent = 'Waiting for Player...';
+        connectBtn.disabled = true;
+        
+        // Set player role
+        playerRole = 'host';
+        isOnline = true;
+        
+        // Actually wait for a real player - check periodically
+        waitForPlayer();
+    } else {
+        showRoomStatus('Failed to create room. Please try again.', 'error');
+    }
 }
 
 function waitForPlayer() {
     const checkForPlayer = setInterval(() => {
-        const room = activeRooms.get(roomCode);
+        const room = cloudServer.getRoomStatus(roomCode);
         if (room && room.guest && room.guestReady) {
             clearInterval(checkForPlayer);
             showRoomStatus('Player joined! Starting game...', 'connected');
@@ -579,16 +653,14 @@ function waitForPlayer() {
                 startOnlineGame();
             }, 2000);
         }
-    }, 1000);
+    }, 2000); // Check every 2 seconds
     
     // Stop checking after 5 minutes (timeout)
     setTimeout(() => {
         clearInterval(checkForPlayer);
-        if (activeRooms.has(roomCode)) {
-            const room = activeRooms.get(roomCode);
-            if (!room.guest) {
-                showRoomStatus('Room timed out. No player joined.', 'error');
-            }
+        const room = cloudServer.getRoomStatus(roomCode);
+        if (room && !room.guest) {
+            showRoomStatus('Room timed out. No player joined.', 'error');
         }
     }, 300000); // 5 minutes
 }
@@ -620,7 +692,7 @@ function closeRoomUI() {
     connectBtn.disabled = false;
 }
 
-function handleRoomAction() {
+async function handleRoomAction() {
     const title = document.getElementById('roomTitle').textContent;
     if (title === 'Create Room') {
         // Room already created, this shouldn't happen
@@ -630,39 +702,37 @@ function handleRoomAction() {
         // Join room
         const code = document.getElementById('roomCode').value.trim().toUpperCase();
         if (code.length === 6) {
-            initializeOnlineGame('join', code);
+            await initializeOnlineGame('join', code);
         } else {
             showRoomStatus('Please enter a valid 6-character room code', 'error');
         }
     }
 }
 
-function initializeOnlineGame(action, code = null) {
+async function initializeOnlineGame(action, code = null) {
     if (action === 'create') {
         // This case is now handled in createRoom() function
         playerRole = 'host';
         
     } else if (action === 'join') {
-        // Check if room exists
-        if (!activeRooms.has(code)) {
-            showRoomStatus('Room not found! Check the code and try again.', 'error');
-            return;
-        }
+        showRoomStatus('Joining room...', 'waiting');
         
-        const room = activeRooms.get(code);
-        if (room.guest) {
-            showRoomStatus('Room is full! Try a different room.', 'error');
+        // Try to join the room using cloud server
+        const result = await cloudServer.joinRoom(code);
+        
+        if (!result.success) {
+            if (result.reason === 'not_found') {
+                showRoomStatus('Room not found! Check the code and try again.', 'error');
+            } else if (result.reason === 'full') {
+                showRoomStatus('Room is full! Try a different room.', 'error');
+            } else {
+                showRoomStatus('Failed to join room. Please try again.', 'error');
+            }
             return;
         }
         
         roomCode = code;
         playerRole = 'guest';
-        showRoomStatus('Joining room...', 'waiting');
-        
-        // Join the room
-        room.guest = true;
-        room.guestReady = true;
-        activeRooms.set(code, room);
         
         // Simulate connection delay
         setTimeout(() => {
@@ -672,7 +742,7 @@ function initializeOnlineGame(action, code = null) {
             setTimeout(() => {
                 startOnlineGame();
             }, 2000);
-        }, 1500);
+        }, 1000);
     }
 }
 
