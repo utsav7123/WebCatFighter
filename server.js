@@ -97,6 +97,30 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle health updates when player hits opponent
+    socket.on('opponentHealthUpdate', (data) => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Send health update to the opponent who was hit
+            socket.to(roomCode).emit('opponentHealthUpdate', {
+                health: data.health,
+                dead: data.dead
+            });
+        }
+    });
+
+    // Handle health updates when player heals themselves (eating mouse)
+    socket.on('myHealthUpdate', (data) => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Send health update to the opponent so they see our new health
+            socket.to(roomCode).emit('myHealthUpdate', {
+                health: data.health,
+                dead: data.dead
+            });
+        }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         console.log('Player disconnected:', socket.id);

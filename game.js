@@ -164,12 +164,33 @@ function initializeRealMultiplayer() {
         if (gameState === "online" && onlineOpponent) {
             onlineOpponent.rect.x = data.x;
             onlineOpponent.rect.y = data.y;
-            onlineOpponent.health = data.health;
+            // DON'T update health from network - health changes happen locally when hit
+            // onlineOpponent.health = data.health;
             onlineOpponent.frame = data.frame;
             onlineOpponent.facing = data.facing;
             onlineOpponent.dead = data.dead || false;
             onlineOpponent.winner = data.winner || false;
             onlineOpponent.eating = data.eating || 0;
+        }
+    });
+    
+    socket.on('opponentHealthUpdate', (data) => {
+        // Handle when the opponent tells us our health was reduced
+        if (gameState === "online") {
+            const myPlayer = playerRole === 'host' ? p1 : p2;
+            myPlayer.health = data.health;
+            myPlayer.dead = data.dead || false;
+            if (myPlayer.dead) {
+                myPlayer.frame = 4;
+            }
+        }
+    });
+    
+    socket.on('myHealthUpdate', (data) => {
+        // Handle when the opponent's health changes (they healed or got hurt)
+        if (gameState === "online" && onlineOpponent) {
+            onlineOpponent.health = data.health;
+            onlineOpponent.dead = data.dead || false;
         }
     });
     
@@ -194,12 +215,21 @@ function sendGameUpdate() {
         socket.emit('gameUpdate', {
             x: myPlayer.rect.x,
             y: myPlayer.rect.y,
-            health: myPlayer.health,
             frame: myPlayer.frame,
             facing: myPlayer.facing,
             dead: myPlayer.dead,
             winner: myPlayer.winner,
             eating: myPlayer.eating
+        });
+    }
+}
+
+function sendHealthUpdate() {
+    if (socket && isOnline && gameState === "online") {
+        const myPlayer = playerRole === 'host' ? p1 : p2;
+        socket.emit('myHealthUpdate', {
+            health: myPlayer.health,
+            dead: myPlayer.dead
         });
     }
 }
@@ -282,6 +312,14 @@ class Fighter {
             opponent.rect.x += this.facing * 10;
             playSound('hit');
             playSound(type === 'light' ? 'punch_light' : 'punch_heavy');
+            
+            // Send opponent's health update in multiplayer when we hit them
+            if (gameState === "online" && socket) {
+                socket.emit('opponentHealthUpdate', {
+                    health: opponent.health,
+                    dead: opponent.health <= 0
+                });
+            }
         }
     }
 
@@ -314,6 +352,11 @@ class Fighter {
             if (this.eating === 0 && this.pending_heal > 0) {
                 this.health += this.pending_heal;
                 this.pending_heal = 0;
+                
+                // Send health update in multiplayer when we heal from eating mouse
+                if (gameState === "online" && socket) {
+                    sendHealthUpdate();
+                }
             }
             return;
         }
