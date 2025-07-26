@@ -164,8 +164,14 @@ function initializeRealMultiplayer() {
         if (gameState === "online" && onlineOpponent) {
             onlineOpponent.rect.x = data.x;
             onlineOpponent.rect.y = data.y;
-            // DON'T update health from network - health changes happen locally when hit
-            // onlineOpponent.health = data.health;
+            // Only update health if opponent is not currently taking damage
+            // This prevents health display conflicts during damage events
+            if (onlineOpponent.hurt_timer <= 0) {
+                if (onlineOpponent.health !== data.health) {
+                    console.log(`[${playerRole}] Opponent health updated via opponentUpdate: ${onlineOpponent.health} -> ${data.health}`);
+                    onlineOpponent.health = data.health;
+                }
+            }
             onlineOpponent.frame = data.frame;
             onlineOpponent.facing = data.facing;
             onlineOpponent.dead = data.dead || false;
@@ -278,7 +284,8 @@ function sendGameUpdate() {
             facing: myPlayer.facing,
             dead: myPlayer.dead,
             winner: myPlayer.winner,
-            eating: myPlayer.eating
+            eating: myPlayer.eating,
+            health: myPlayer.health // Add health back for real-time display
         });
     }
 }
