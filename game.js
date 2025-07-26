@@ -160,10 +160,13 @@ function initializeRealMultiplayer() {
     });
     
     socket.on('opponentUpdate', (data) => {
-        // Update opponent's position and state
+        // Update opponent's position and state with smoothing
         if (gameState === "online" && onlineOpponent) {
-            onlineOpponent.rect.x = data.x;
-            onlineOpponent.rect.y = data.y;
+            // Smooth position updates to reduce lag appearance
+            const smoothFactor = 0.7; // Adjust between 0-1 for smoothing strength
+            onlineOpponent.rect.x = onlineOpponent.rect.x * (1 - smoothFactor) + data.x * smoothFactor;
+            onlineOpponent.rect.y = data.y; // Don't smooth Y for jumping accuracy
+            
             // Only update health if opponent is not currently taking damage
             // This prevents health display conflicts during damage events
             if (onlineOpponent.hurt_timer <= 0) {
@@ -268,25 +271,35 @@ function initializeRealMultiplayer() {
 }
 
 let lastUpdateTime = 0;
-const UPDATE_INTERVAL = 16; // ~60 FPS
+let lastSentState = {};
+const UPDATE_INTERVAL = 8; // ~120 FPS for smoother movement
 
 function sendGameUpdate() {
     if (socket && isOnline && gameState === "online") {
         const now = Date.now();
-        if (now - lastUpdateTime < UPDATE_INTERVAL) return; // Throttle updates
-        lastUpdateTime = now;
-        
         const myPlayer = playerRole === 'host' ? p1 : p2;
-        socket.emit('gameUpdate', {
-            x: myPlayer.rect.x,
-            y: myPlayer.rect.y,
+        
+        const currentState = {
+            x: Math.round(myPlayer.rect.x),
+            y: Math.round(myPlayer.rect.y),
             frame: myPlayer.frame,
             facing: myPlayer.facing,
             dead: myPlayer.dead,
             winner: myPlayer.winner,
             eating: myPlayer.eating,
-            health: myPlayer.health // Add health back for real-time display
-        });
+            health: myPlayer.health
+        };
+        
+        // Check if anything significant changed or enough time passed
+        const hasChanged = JSON.stringify(currentState) !== JSON.stringify(lastSentState);
+        const shouldSendUpdate = hasChanged || (now - lastUpdateTime > UPDATE_INTERVAL * 2);
+        
+        if (shouldSendUpdate && now - lastUpdateTime >= UPDATE_INTERVAL) {
+            lastUpdateTime = now;
+            lastSentState = { ...currentState };
+            
+            socket.emit('gameUpdate', currentState);
+        }
     }
 }
 
@@ -788,12 +801,12 @@ let touchThrottleTimer = {};
 function handleTouchInput(action, pressed) {
     let keyMappings;
     
-    // Throttle touch input to prevent speed issues
+    // Light throttling to prevent spam, but allow responsive movement
     const now = Date.now();
     const throttleKey = `${action}_${pressed}`;
     
-    if (touchThrottleTimer[throttleKey] && now - touchThrottleTimer[throttleKey] < 16) {
-        // Throttle to ~60fps (16ms between events)
+    if (touchThrottleTimer[throttleKey] && now - touchThrottleTimer[throttleKey] < 5) {
+        // Very light throttle - just prevent rapid spam
         return;
     }
     touchThrottleTimer[throttleKey] = now;
