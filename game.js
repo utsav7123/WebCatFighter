@@ -161,12 +161,15 @@ function initializeRealMultiplayer() {
     
     socket.on('opponentUpdate', (data) => {
         // Update opponent's position and state
-        if (onlineOpponent) {
+        if (gameState === "online" && onlineOpponent) {
             onlineOpponent.rect.x = data.x;
             onlineOpponent.rect.y = data.y;
             onlineOpponent.health = data.health;
             onlineOpponent.frame = data.frame;
             onlineOpponent.facing = data.facing;
+            onlineOpponent.dead = data.dead || false;
+            onlineOpponent.winner = data.winner || false;
+            onlineOpponent.eating = data.eating || 0;
         }
     });
     
@@ -178,15 +181,25 @@ function initializeRealMultiplayer() {
     return true;
 }
 
+let lastUpdateTime = 0;
+const UPDATE_INTERVAL = 16; // ~60 FPS
+
 function sendGameUpdate() {
-    if (socket && isOnline) {
+    if (socket && isOnline && gameState === "online") {
+        const now = Date.now();
+        if (now - lastUpdateTime < UPDATE_INTERVAL) return; // Throttle updates
+        lastUpdateTime = now;
+        
         const myPlayer = playerRole === 'host' ? p1 : p2;
         socket.emit('gameUpdate', {
             x: myPlayer.rect.x,
             y: myPlayer.rect.y,
             health: myPlayer.health,
             frame: myPlayer.frame,
-            facing: myPlayer.facing
+            facing: myPlayer.facing,
+            dead: myPlayer.dead,
+            winner: myPlayer.winner,
+            eating: myPlayer.eating
         });
     }
 }
@@ -801,7 +814,14 @@ function startOnlineGame() {
     currentMouse = null;
     
     // Set up opponent reference for real-time sync
-    onlineOpponent = playerRole === 'host' ? p2 : p1;
+    // Host controls p1, Guest controls p2
+    if (playerRole === 'host') {
+        onlineOpponent = p2; // Host receives updates for p2 (guest's player)
+        console.log('Host: I control p1, opponent is p2');
+    } else if (playerRole === 'guest') {
+        onlineOpponent = p1; // Guest receives updates for p1 (host's player)
+        console.log('Guest: I control p2, opponent is p1');
+    }
 }
 
 function generateRoomCode() {
@@ -840,12 +860,24 @@ function gameLoop() {
     } else {
         // Update game logic
         if (!isAnyoneEating()) {
-            p1.update(p2);
-            if (gameState === "2player" || gameState === "online") {
-                p2.update(p1);
+            if (gameState === "online") {
+                // In online mode, each player only controls their own character
+                if (playerRole === 'host') {
+                    p1.update(p2); // Host controls p1
+                    p2.physics(); // Guest's player still needs physics
+                } else if (playerRole === 'guest') {
+                    p2.update(p1); // Guest controls p2
+                    p1.physics(); // Host's player still needs physics
+                }
             } else {
-                p2.aiControl(p1);
-                p2.physics();
+                // Local multiplayer - both players update normally
+                p1.update(p2);
+                if (gameState === "2player") {
+                    p2.update(p1);
+                } else {
+                    p2.aiControl(p1);
+                    p2.physics();
+                }
             }
         } else {
             if (p1.eating > 0) p1.update(p2);
