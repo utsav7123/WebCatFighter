@@ -97,8 +97,18 @@ button:active {
 }
 
 .touch-controls-left {
-    flex-direction: row;
-    align-items: flex-end;
+    align-items: center;
+}
+
+.jump-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 5px;
+}
+
+.arrow-row {
+    display: flex;
+    gap: 10px;
 }
 
 .touch-btn {
@@ -112,7 +122,7 @@ button:active {
     font-weight: bold;
     touch-action: manipulation;
     user-select: none;
-    margin: 5px;
+    margin: 2px;
 }
 
 .touch-btn:active {
@@ -121,9 +131,10 @@ button:active {
 }
 
 .jump-btn {
-    width: 80px;
-    height: 40px;
-    border-radius: 20px;
+    width: 70px;
+    height: 70px;
+    font-size: 24px;
+    border-radius: 50%;
 }
 
 .attack-btn.light {
