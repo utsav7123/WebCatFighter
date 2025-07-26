@@ -164,6 +164,18 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle damage dealing - player tells opponent they hit them
+    socket.on('takeDamage', (data) => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Send damage to the opponent who was hit
+            socket.to(roomCode).emit('takeDamage', {
+                damage: data.damage,
+                pushDistance: data.pushDistance
+            });
+        }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         console.log('Player disconnected:', socket.id);

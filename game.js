@@ -231,6 +231,28 @@ function initializeRealMultiplayer() {
         }
     });
     
+    socket.on('takeDamage', (data) => {
+        // Handle when opponent hits me - I take damage
+        if (gameState === "online") {
+            const myPlayer = playerRole === 'host' ? p1 : p2;
+            const oldHealth = myPlayer.health;
+            myPlayer.health -= data.damage;
+            myPlayer.hurt_timer = 18;
+            myPlayer.frame = 3;
+            myPlayer.rect.x += data.pushDistance;
+            
+            console.log(`[${playerRole}] I took ${data.damage} damage! My health: ${oldHealth} -> ${myPlayer.health}`);
+            
+            if (myPlayer.health <= 0) {
+                myPlayer.health = 0;
+                myPlayer.dead = true;
+                myPlayer.frame = 4;
+            }
+            
+            playSound('hit');
+        }
+    });
+    
     socket.on('playerDisconnected', () => {
         showRoomStatus('Other player disconnected', 'error');
         // Handle player disconnect (maybe return to menu)
@@ -264,6 +286,7 @@ function sendGameUpdate() {
 function sendHealthUpdate() {
     if (socket && isOnline && gameState === "online") {
         const myPlayer = playerRole === 'host' ? p1 : p2;
+        console.log(`[${playerRole}] Sending myHealthUpdate - My health: ${myPlayer.health}, dead: ${myPlayer.dead}`);
         socket.emit('myHealthUpdate', {
             health: myPlayer.health,
             dead: myPlayer.dead
@@ -343,22 +366,24 @@ class Fighter {
         };
 
         if (this.collideRect(attackRect, opponent.rect) && !opponent.dead) {
-            const oldHealth = opponent.health;
-            opponent.health -= dmg;
-            const newHealth = opponent.health;
-            opponent.hurt_timer = 18;
-            opponent.frame = 3;
-            opponent.rect.x += this.facing * 10;
-            playSound('hit');
-            playSound(type === 'light' ? 'punch_light' : 'punch_heavy');
-            
-            // Send opponent's health update in multiplayer when we hit them
             if (gameState === "online" && socket) {
-                console.log(`[${playerRole}] I hit opponent! Their health: ${oldHealth} -> ${newHealth}`);
-                socket.emit('opponentHealthUpdate', {
-                    health: opponent.health,
-                    dead: opponent.health <= 0
+                // In multiplayer, send damage to opponent and let them handle their own health
+                console.log(`[${playerRole}] I hit opponent! Sending ${dmg} damage`);
+                socket.emit('takeDamage', {
+                    damage: dmg,
+                    pushDistance: this.facing * 10
                 });
+                playSound('hit');
+                playSound(type === 'light' ? 'punch_light' : 'punch_heavy');
+            } else {
+                // Local game - original logic
+                const oldHealth = opponent.health;
+                opponent.health -= dmg;
+                opponent.hurt_timer = 18;
+                opponent.frame = 3;
+                opponent.rect.x += this.facing * 10;
+                playSound('hit');
+                playSound(type === 'light' ? 'punch_light' : 'punch_heavy');
             }
         }
     }
@@ -390,11 +415,14 @@ class Fighter {
             this.frame = this.eating > CONFIG.EAT_ANIMATION_FRAMES/2 ? 7 : 8;
             this.eating--;
             if (this.eating === 0 && this.pending_heal > 0) {
+                const oldHealth = this.health;
                 this.health += this.pending_heal;
+                const newHealth = this.health;
                 this.pending_heal = 0;
                 
                 // Send health update in multiplayer when we heal from eating mouse
                 if (gameState === "online" && socket) {
+                    console.log(`[${playerRole}] I healed from eating mouse! My health: ${oldHealth} -> ${newHealth}, sending myHealthUpdate`);
                     sendHealthUpdate();
                 }
             }
