@@ -38,6 +38,9 @@ let roomCode = null;
 let playerRole = null; // 'host' or 'guest'
 let onlineOpponent = null;
 
+// Simple room storage (in real app, this would be on server)
+let activeRooms = new Map();
+
 // Assets
 let assets = {
     images: {},
@@ -542,6 +545,14 @@ function createRoom() {
     document.getElementById('roomCode').placeholder = 'Your room code';
     document.getElementById('roomUI').style.display = 'flex';
     
+    // Store the room
+    activeRooms.set(roomCode, {
+        host: true,
+        guest: false,
+        hostReady: true,
+        guestReady: false
+    });
+    
     // Show immediate status
     showRoomStatus(`Room created! Share code: ${roomCode}`, 'connected');
     
@@ -550,13 +561,36 @@ function createRoom() {
     connectBtn.textContent = 'Waiting for Player...';
     connectBtn.disabled = true;
     
-    // Simulate waiting for player (in real implementation, this would be handled by server)
+    // Set player role
+    playerRole = 'host';
+    isOnline = true;
+    
+    // Actually wait for a real player - check periodically
+    waitForPlayer();
+}
+
+function waitForPlayer() {
+    const checkForPlayer = setInterval(() => {
+        const room = activeRooms.get(roomCode);
+        if (room && room.guest && room.guestReady) {
+            clearInterval(checkForPlayer);
+            showRoomStatus('Player joined! Starting game...', 'connected');
+            setTimeout(() => {
+                startOnlineGame();
+            }, 2000);
+        }
+    }, 1000);
+    
+    // Stop checking after 5 minutes (timeout)
     setTimeout(() => {
-        showRoomStatus('Player joined! Starting game...', 'connected');
-        setTimeout(() => {
-            startOnlineGame();
-        }, 2000);
-    }, 3000);
+        clearInterval(checkForPlayer);
+        if (activeRooms.has(roomCode)) {
+            const room = activeRooms.get(roomCode);
+            if (!room.guest) {
+                showRoomStatus('Room timed out. No player joined.', 'error');
+            }
+        }
+    }, 300000); // 5 minutes
 }
 
 function joinRoom() {
@@ -604,26 +638,51 @@ function handleRoomAction() {
 }
 
 function initializeOnlineGame(action, code = null) {
-    // For now, we'll simulate online play with a simple implementation
-    // In production, you'd connect to a real server
     if (action === 'create') {
         // This case is now handled in createRoom() function
-        // Room code is already generated and displayed
         playerRole = 'host';
         
     } else if (action === 'join') {
+        // Check if room exists
+        if (!activeRooms.has(code)) {
+            showRoomStatus('Room not found! Check the code and try again.', 'error');
+            return;
+        }
+        
+        const room = activeRooms.get(code);
+        if (room.guest) {
+            showRoomStatus('Room is full! Try a different room.', 'error');
+            return;
+        }
+        
         roomCode = code;
         playerRole = 'guest';
         showRoomStatus('Joining room...', 'waiting');
         
-        // Simulate joining
+        // Join the room
+        room.guest = true;
+        room.guestReady = true;
+        activeRooms.set(code, room);
+        
+        // Simulate connection delay
         setTimeout(() => {
             showRoomStatus('Connected! Starting game...', 'connected');
+            
+            // Start the game
             setTimeout(() => {
                 startOnlineGame();
             }, 2000);
         }, 1500);
     }
+}
+
+function startOnlineGame() {
+    closeRoomUI();
+    isOnline = true;
+    gameState = "online";
+    enableAudio();
+    reset();
+    currentMouse = null;
 }
 
 function generateRoomCode() {
@@ -639,15 +698,6 @@ function showRoomStatus(message, type) {
     const statusDiv = document.getElementById('roomStatus');
     statusDiv.innerHTML = message;
     statusDiv.className = `status-${type}`;
-}
-
-function startOnlineGame() {
-    closeRoomUI();
-    isOnline = true;
-    gameState = "online";
-    enableAudio();
-    reset();
-    currentMouse = null;
 }
 
 // Note: This is a simplified implementation
