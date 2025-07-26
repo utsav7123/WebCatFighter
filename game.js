@@ -160,12 +160,11 @@ function initializeRealMultiplayer() {
     });
     
     socket.on('opponentUpdate', (data) => {
-        // Update opponent's position and state with smoothing
+        // Update opponent's position and state - NO smoothing to prevent speed issues
         if (gameState === "online" && onlineOpponent) {
-            // Smooth position updates to reduce lag appearance
-            const smoothFactor = 0.7; // Adjust between 0-1 for smoothing strength
-            onlineOpponent.rect.x = onlineOpponent.rect.x * (1 - smoothFactor) + data.x * smoothFactor;
-            onlineOpponent.rect.y = data.y; // Don't smooth Y for jumping accuracy
+            // Direct position update - no interpolation to prevent speed inconsistencies
+            onlineOpponent.rect.x = data.x;
+            onlineOpponent.rect.y = data.y;
             
             // Only update health if opponent is not currently taking damage
             // This prevents health display conflicts during damage events
@@ -272,7 +271,7 @@ function initializeRealMultiplayer() {
 
 let lastUpdateTime = 0;
 let lastSentState = {};
-const UPDATE_INTERVAL = 8; // ~120 FPS for smoother movement
+const UPDATE_INTERVAL = 16; // Back to ~60 FPS for more stable movement
 
 function sendGameUpdate() {
     if (socket && isOnline && gameState === "online") {
@@ -290,11 +289,18 @@ function sendGameUpdate() {
             health: myPlayer.health
         };
         
-        // Check if anything significant changed or enough time passed
-        const hasChanged = JSON.stringify(currentState) !== JSON.stringify(lastSentState);
-        const shouldSendUpdate = hasChanged || (now - lastUpdateTime > UPDATE_INTERVAL * 2);
+        // Only send if position actually changed or other significant state change
+        const positionChanged = !lastSentState.x || Math.abs(currentState.x - lastSentState.x) >= 1;
+        const stateChanged = currentState.frame !== lastSentState.frame || 
+                            currentState.facing !== lastSentState.facing ||
+                            currentState.dead !== lastSentState.dead ||
+                            currentState.winner !== lastSentState.winner ||
+                            currentState.eating !== lastSentState.eating ||
+                            currentState.health !== lastSentState.health;
         
-        if (shouldSendUpdate && now - lastUpdateTime >= UPDATE_INTERVAL) {
+        const shouldSendUpdate = (positionChanged || stateChanged) && (now - lastUpdateTime >= UPDATE_INTERVAL);
+        
+        if (shouldSendUpdate) {
             lastUpdateTime = now;
             lastSentState = { ...currentState };
             
@@ -365,8 +371,8 @@ class Fighter {
         }
         
         // Log movement for debugging mobile speed issues
-        if (dx !== 0 && Math.random() < 0.1) { // Log 10% of movements to avoid spam
-            console.log(`[${playerRole || 'local'}] Player moving: dx=${dx}, x=${this.rect.x}`);
+        if (dx !== 0 && Math.random() < 0.2) { // Log 20% of movements to debug guest speed
+            console.log(`[${playerRole || 'local'}] Player moving: dx=${dx}, x=${this.rect.x}, controls=${JSON.stringify(this.controls)}`);
         }
         
         this.rect.x += dx;
@@ -801,12 +807,12 @@ let touchThrottleTimer = {};
 function handleTouchInput(action, pressed) {
     let keyMappings;
     
-    // Light throttling to prevent spam, but allow responsive movement
+    // Moderate throttling to ensure consistent speed between host and guest
     const now = Date.now();
     const throttleKey = `${action}_${pressed}`;
     
-    if (touchThrottleTimer[throttleKey] && now - touchThrottleTimer[throttleKey] < 5) {
-        // Very light throttle - just prevent rapid spam
+    if (touchThrottleTimer[throttleKey] && now - touchThrottleTimer[throttleKey] < 10) {
+        // 10ms throttle for consistent mobile controls
         return;
     }
     touchThrottleTimer[throttleKey] = now;
