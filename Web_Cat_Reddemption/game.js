@@ -31,13 +31,6 @@ let keys = {};
 let audioEnabled = false;
 let currentMouse = null;
 
-// Online Multiplayer
-let socket = null;
-let isOnline = false;
-let roomCode = null;
-let playerRole = null; // 'host' or 'guest'
-let onlineOpponent = null;
-
 // Assets
 let assets = {
     images: {},
@@ -343,13 +336,8 @@ function drawMenu() {
     ctx.fillText('Cat Fighter', CONFIG.WIN_W/2, CONFIG.WIN_H/3);
     
     ctx.font = '24px Arial';
-    if (isOnline && roomCode) {
-        ctx.fillText(`Online Room: ${roomCode}`, CONFIG.WIN_W/2, CONFIG.WIN_H/2 - 50);
-        ctx.fillText(`You are: ${playerRole}`, CONFIG.WIN_W/2, CONFIG.WIN_H/2 - 20);
-    } else {
-        ctx.fillText('Press 1 for Single Player', CONFIG.WIN_W/2, CONFIG.WIN_H/2);
-        ctx.fillText('Press 2 for Two Players', CONFIG.WIN_W/2, CONFIG.WIN_H/2 + 50);
-    }
+    ctx.fillText('Press 1 for Single Player', CONFIG.WIN_W/2, CONFIG.WIN_H/2);
+    ctx.fillText('Press 2 for Two Players', CONFIG.WIN_W/2, CONFIG.WIN_H/2 + 50);
 }
 
 function reset() {
@@ -451,54 +439,6 @@ function setupInput() {
     document.addEventListener('keyup', (e) => {
         keys[e.code] = false;
     });
-
-    // Mobile touch controls
-    setupTouchControls();
-    
-    // Detect mobile device
-    if (isMobile()) {
-        document.getElementById('mobileControls').style.display = 'flex';
-    }
-}
-
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           (window.innerWidth <= 768);
-}
-
-function setupTouchControls() {
-    const touchButtons = document.querySelectorAll('.touch-btn');
-    
-    touchButtons.forEach(btn => {
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const key = btn.dataset.key;
-            handleTouchInput(key, true);
-        });
-        
-        btn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            const key = btn.dataset.key;
-            handleTouchInput(key, false);
-        });
-        
-        // Prevent context menu on long press
-        btn.addEventListener('contextmenu', (e) => e.preventDefault());
-    });
-}
-
-function handleTouchInput(action, pressed) {
-    const keyMappings = {
-        'left': 'KeyA',
-        'right': 'KeyD', 
-        'jump': 'KeyW',
-        'light': 'KeyR',
-        'heavy': 'KeyT'
-    };
-    
-    if (keyMappings[action]) {
-        keys[keyMappings[action]] = pressed;
-    }
 }
 
 // Game Control Functions
@@ -533,129 +473,6 @@ function restartGame() {
     stopSound('mice');
 }
 
-// Online Multiplayer Functions
-function createRoom() {
-    document.getElementById('roomTitle').textContent = 'Create Room';
-    roomCode = generateRoomCode();
-    document.getElementById('roomCode').value = roomCode;
-    document.getElementById('roomCode').disabled = true;
-    document.getElementById('roomCode').placeholder = 'Your room code';
-    document.getElementById('roomUI').style.display = 'flex';
-    
-    // Show immediate status
-    showRoomStatus(`Room created! Share code: ${roomCode}`, 'connected');
-    
-    // Change button text to indicate waiting
-    const connectBtn = document.querySelector('#roomUI button');
-    connectBtn.textContent = 'Waiting for Player...';
-    connectBtn.disabled = true;
-    
-    // Simulate waiting for player (in real implementation, this would be handled by server)
-    setTimeout(() => {
-        showRoomStatus('Player joined! Starting game...', 'connected');
-        setTimeout(() => {
-            startOnlineGame();
-        }, 2000);
-    }, 3000);
-}
-
-function joinRoom() {
-    document.getElementById('roomTitle').textContent = 'Join Room';
-    document.getElementById('roomCode').placeholder = 'Enter room code';
-    document.getElementById('roomCode').disabled = false;
-    document.getElementById('roomCode').value = '';
-    document.getElementById('roomUI').style.display = 'flex';
-    
-    // Reset button
-    const connectBtn = document.querySelector('#roomUI button');
-    connectBtn.textContent = 'Connect';
-    connectBtn.disabled = false;
-    
-    // Clear any previous status
-    document.getElementById('roomStatus').innerHTML = '';
-}
-
-function closeRoomUI() {
-    document.getElementById('roomUI').style.display = 'none';
-    document.getElementById('roomCode').value = '';
-    document.getElementById('roomStatus').innerHTML = '';
-    
-    // Reset button
-    const connectBtn = document.querySelector('#roomUI button');
-    connectBtn.textContent = 'Connect';
-    connectBtn.disabled = false;
-}
-
-function handleRoomAction() {
-    const title = document.getElementById('roomTitle').textContent;
-    if (title === 'Create Room') {
-        // Room already created, this shouldn't happen
-        // But if it does, just close the UI
-        closeRoomUI();
-    } else {
-        // Join room
-        const code = document.getElementById('roomCode').value.trim().toUpperCase();
-        if (code.length === 6) {
-            initializeOnlineGame('join', code);
-        } else {
-            showRoomStatus('Please enter a valid 6-character room code', 'error');
-        }
-    }
-}
-
-function initializeOnlineGame(action, code = null) {
-    // For now, we'll simulate online play with a simple implementation
-    // In production, you'd connect to a real server
-    if (action === 'create') {
-        // This case is now handled in createRoom() function
-        // Room code is already generated and displayed
-        playerRole = 'host';
-        
-    } else if (action === 'join') {
-        roomCode = code;
-        playerRole = 'guest';
-        showRoomStatus('Joining room...', 'waiting');
-        
-        // Simulate joining
-        setTimeout(() => {
-            showRoomStatus('Connected! Starting game...', 'connected');
-            setTimeout(() => {
-                startOnlineGame();
-            }, 2000);
-        }, 1500);
-    }
-}
-
-function generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 6; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-function showRoomStatus(message, type) {
-    const statusDiv = document.getElementById('roomStatus');
-    statusDiv.innerHTML = message;
-    statusDiv.className = `status-${type}`;
-}
-
-function startOnlineGame() {
-    closeRoomUI();
-    isOnline = true;
-    gameState = "online";
-    enableAudio();
-    reset();
-    currentMouse = null;
-}
-
-// Note: This is a simplified implementation
-// For real online multiplayer, you would need:
-// 1. A Node.js server with Socket.io
-// 2. Real-time synchronization of game state
-// 3. Proper latency handling and prediction
-
 // Main Game Loop
 function gameLoop() {
     // Clear canvas
@@ -672,7 +489,7 @@ function gameLoop() {
         // Update game logic
         if (!isAnyoneEating()) {
             p1.update(p2);
-            if (gameState === "2player" || gameState === "online") {
+            if (gameState === "2player") {
                 p2.update(p1);
             } else {
                 p2.aiControl(p1);

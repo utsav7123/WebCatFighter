@@ -76,3 +76,144 @@ button:hover {
 button:active {
     transform: translateY(0);
 }
+
+/* Mobile Touch Controls */
+.mobile-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 1000;
+}
+
+.touch-controls-left,
+.touch-controls-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.touch-controls-left {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.touch-btn {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 16px;
+    font-weight: bold;
+    touch-action: manipulation;
+    user-select: none;
+    margin: 5px;
+}
+
+.touch-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(0.95);
+}
+
+.jump-btn {
+    width: 80px;
+    height: 40px;
+    border-radius: 20px;
+}
+
+.attack-btn.light {
+    background: rgba(0, 123, 255, 0.8);
+}
+
+.attack-btn.heavy {
+    background: rgba(220, 53, 69, 0.8);
+}
+
+/* Room System UI */
+.room-ui {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.room-container {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    min-width: 300px;
+}
+
+.room-container h3 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.room-container input {
+    width: 200px;
+    padding: 10px;
+    margin: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 18px;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+#roomStatus {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.status-waiting {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-connected {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    #gameCanvas {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .player-controls {
+        min-width: auto;
+    }
+    
+    .mobile-controls {
+        display: flex !important;
+    }
+}

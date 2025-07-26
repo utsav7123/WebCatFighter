@@ -23,9 +23,36 @@
         <div class="menu-controls">
             <button onclick="startSinglePlayer()">Single Player</button>
             <button onclick="startTwoPlayer()">Two Player</button>
+            <button onclick="createRoom()">Create Online Room</button>
+            <button onclick="joinRoom()">Join Room</button>
             <button onclick="restartGame()">Restart (F1)</button>
         </div>
+        
+        <!-- Mobile Touch Controls -->
+        <div id="mobileControls" class="mobile-controls" style="display: none;">
+            <div class="touch-controls-left">
+                <button class="touch-btn move-btn" data-key="left">←</button>
+                <button class="touch-btn move-btn" data-key="right">→</button>
+                <button class="touch-btn jump-btn" data-key="jump">Jump</button>
+            </div>
+            <div class="touch-controls-right">
+                <button class="touch-btn attack-btn light" data-key="light">Light</button>
+                <button class="touch-btn attack-btn heavy" data-key="heavy">Heavy</button>
+            </div>
+        </div>
+        
+        <!-- Room System UI -->
+        <div id="roomUI" class="room-ui" style="display: none;">
+            <div class="room-container">
+                <h3 id="roomTitle">Create/Join Room</h3>
+                <input type="text" id="roomCode" placeholder="Enter room code" maxlength="6">
+                <button onclick="handleRoomAction()">Connect</button>
+                <button onclick="closeRoomUI()">Cancel</button>
+                <div id="roomStatus"></div>
+            </div>
+        </div>
     </div>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

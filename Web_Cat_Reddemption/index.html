@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat Fighter - Web Edition</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1>Cat Fighter</h1>
+        <canvas id="gameCanvas" width="900" height="500"></canvas>
+        <div class="controls">
+            <div class="player-controls">
+                <h3>Player 1 Controls:</h3>
+                <p>Move: A/D | Jump: W | Light: R | Heavy: T</p>
+            </div>
+            <div class="player-controls">
+                <h3>Player 2 Controls:</h3>
+                <p>Move: ←/→ | Jump: ↑ | Light: Num1 | Heavy: Num2</p>
+            </div>
+        </div>
+        <div class="menu-controls">
+            <button onclick="startSinglePlayer()">Single Player</button>
+            <button onclick="startTwoPlayer()">Two Player</button>
+            <button onclick="restartGame()">Restart (F1)</button>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
