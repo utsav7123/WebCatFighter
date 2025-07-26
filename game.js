@@ -334,12 +334,14 @@ class Fighter {
         if (this.dead || this.winner || this.eating > 0) return;
         
         let dx = 0;
+        const moveSpeed = 5; // Consistent movement speed
+        
         if (keys[this.controls.left]) {
-            dx = -5;
+            dx = -moveSpeed;
             this.facing = -1;
         }
         if (keys[this.controls.right]) {
-            dx = 5;
+            dx = moveSpeed;
             this.facing = 1;
         }
         if (keys[this.controls.jump] && this.on_ground) {
@@ -347,6 +349,11 @@ class Fighter {
             this.frame = 2;
             this.anim_timer = 15;
             playSound('jump');
+        }
+        
+        // Log movement for debugging mobile speed issues
+        if (dx !== 0 && Math.random() < 0.1) { // Log 10% of movements to avoid spam
+            console.log(`[${playerRole || 'local'}] Player moving: dx=${dx}, x=${this.rect.x}`);
         }
         
         this.rect.x += dx;
@@ -775,8 +782,21 @@ function setupTouchControls() {
     });
 }
 
+// Touch input throttling to prevent speed issues
+let touchThrottleTimer = {};
+
 function handleTouchInput(action, pressed) {
     let keyMappings;
+    
+    // Throttle touch input to prevent speed issues
+    const now = Date.now();
+    const throttleKey = `${action}_${pressed}`;
+    
+    if (touchThrottleTimer[throttleKey] && now - touchThrottleTimer[throttleKey] < 16) {
+        // Throttle to ~60fps (16ms between events)
+        return;
+    }
+    touchThrottleTimer[throttleKey] = now;
     
     if (gameState === "online") {
         // In multiplayer, map controls based on player role
@@ -995,7 +1015,26 @@ function showRoomStatus(message, type) {
 // 3. Proper latency handling and prediction
 
 // Main Game Loop
+// Frame rate tracking for debugging
+let lastFrameTime = 0;
+let frameCount = 0;
+let fpsReportTime = 0;
+
 function gameLoop() {
+    // Frame rate debugging
+    const currentTime = performance.now();
+    const deltaTime = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+    frameCount++;
+    
+    // Report FPS every 5 seconds
+    if (currentTime - fpsReportTime > 5000) {
+        const fps = Math.round(frameCount / 5);
+        console.log(`[${playerRole || 'local'}] FPS: ${fps}, Delta: ${Math.round(deltaTime)}ms`);
+        frameCount = 0;
+        fpsReportTime = currentTime;
+    }
+    
     // Clear canvas
     ctx.clearRect(0, 0, CONFIG.WIN_W, CONFIG.WIN_H);
     
