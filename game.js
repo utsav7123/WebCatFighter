@@ -39,12 +39,13 @@ let playerRole = null; // 'host' or 'guest'
 let onlineOpponent = null;
 
 // SERVER CONFIGURATION
-// STEP 1: Deploy server.js to Railway (see DEPLOYMENT_GUIDE.md)
-// STEP 2: Replace the URL below with your Railway app URL
-// STEP 3: Uncomment the line below and comment out the demo cloudServer
-// const SERVER_URL = 'https://your-app-name.up.railway.app'; // Replace with your deployed URL
+// STEP 1: Deploy server.js to Railway (see DEPLOYMENT_GUIDE.md) ✅ DONE
+// STEP 2: Replace the URL below with your Railway app URL ✅ DONE
+// STEP 3: Uncomment the line below and comment out the demo cloudServer ✅ DONE
+const SERVER_URL = 'https://webcatfighter-production.up.railway.app'; // Your deployed Railway URL
 
-// DEMO MODE (Remove this section after deploying real server)
+// DEMO MODE (DISABLED - Real server is now active!)
+/*
 // IMPORTANT: This is a demo version
 // For real cross-device multiplayer, you need the server.js file running on a hosting service
 // For now, this simulates the room system for local testing
@@ -97,9 +98,9 @@ let cloudServer = {
         return null;
     }
 };
+*/
 
-// REAL MULTIPLAYER (Uncomment after deploying server)
-/*
+// REAL MULTIPLAYER (Now active with Railway server!)
 function initializeRealMultiplayer() {
     if (typeof io === 'undefined') {
         console.error('Socket.io not loaded. Make sure socket.io script is included in index.html');
@@ -116,7 +117,7 @@ function initializeRealMultiplayer() {
         roomCode = data.roomCode;
         playerRole = data.role;
         isOnline = true;
-        showRoomStatus(`Room created! Code: ${roomCode}\\nWaiting for player to join...`, 'connected');
+        showRoomStatus(`Room created! Code: ${roomCode}\nWaiting for player to join...`, 'connected');
         
         // Wait for another player
         socket.on('playerJoined', () => {
@@ -173,7 +174,7 @@ function sendGameUpdate() {
         });
     }
 }
-*/
+
 
 // Assets
 let assets = {
@@ -675,45 +676,16 @@ async function createRoom() {
     document.getElementById('roomTitle').textContent = 'Create Room';
     document.getElementById('roomCode').value = '';
     document.getElementById('roomCode').disabled = true;
-    document.getElementById('roomCode').placeholder = 'Generating room code...';
+    document.getElementById('roomCode').placeholder = 'Connecting to server...';
     document.getElementById('roomUI').style.display = 'flex';
     
-    // Check if real server is available (uncomment after deployment)
-    /*
+    // Use real server (Railway)
     if (typeof SERVER_URL !== 'undefined' && initializeRealMultiplayer()) {
         showRoomStatus('Creating room...', 'waiting');
         socket.emit('createRoom');
         return;
-    }
-    */
-    
-    // DEMO MODE - Remove this section after deploying real server
-    roomCode = generateRoomCode();
-    document.getElementById('roomCode').value = roomCode;
-    document.getElementById('roomCode').placeholder = 'Your room code';
-    
-    // Show demo warning
-    showRoomStatus(`DEMO MODE: Room created! Code: ${roomCode}\n\nNOTE: For real cross-device multiplayer, deploy the server using DEPLOYMENT_GUIDE.md`, 'connected');
-    
-    // Store the room in cloud server
-    const success = await cloudServer.createRoom(roomCode);
-    
-    if (success) {
-        // Change button text to indicate waiting
-        const connectBtn = document.querySelector('#roomUI button');
-        connectBtn.textContent = 'Start Demo Game';
-        connectBtn.disabled = false;
-        
-        // Set player role
-        playerRole = 'host';
-        isOnline = true;
-        
-        // In demo mode, allow immediate start
-        connectBtn.onclick = () => {
-            startOnlineGame();
-        };
     } else {
-        showRoomStatus('Failed to create room. Please try again.', 'error');
+        showRoomStatus('Failed to connect to server. Please try again.', 'error');
     }
 }
 
@@ -786,45 +758,15 @@ async function initializeOnlineGame(action, code = null) {
         playerRole = 'host';
         
     } else if (action === 'join') {
-        // Check if real server is available (uncomment after deployment)
-        /*
+        // Use real server (Railway)
         if (typeof SERVER_URL !== 'undefined' && initializeRealMultiplayer()) {
             showRoomStatus('Joining room...', 'waiting');
             socket.emit('joinRoom', code);
             roomCode = code;
             return;
+        } else {
+            showRoomStatus('Failed to connect to server. Please try again.', 'error');
         }
-        */
-        
-        // DEMO MODE - Remove this section after deploying real server
-        showRoomStatus('DEMO MODE: Joining room...', 'waiting');
-        
-        // Try to join the room using cloud server
-        const result = await cloudServer.joinRoom(code);
-        
-        if (!result.success) {
-            if (result.reason === 'not_found') {
-                showRoomStatus('In DEMO MODE, any 6-character code works.\n\nFor real cross-device play, deploy using DEPLOYMENT_GUIDE.md', 'error');
-            } else if (result.reason === 'full') {
-                showRoomStatus('Room is full! Try a different room.', 'error');
-            } else {
-                showRoomStatus('Failed to join room. Please try again.', 'error');
-            }
-            return;
-        }
-        
-        roomCode = code;
-        playerRole = 'guest';
-        
-        // Simulate connection delay
-        setTimeout(() => {
-            showRoomStatus('DEMO: Connected! Starting game...', 'connected');
-            
-            // Start the game
-            setTimeout(() => {
-                startOnlineGame();
-            }, 2000);
-        }, 1000);
     }
 }
 
@@ -835,6 +777,9 @@ function startOnlineGame() {
     enableAudio();
     reset();
     currentMouse = null;
+    
+    // Set up opponent reference for real-time sync
+    onlineOpponent = playerRole === 'host' ? p2 : p1;
 }
 
 function generateRoomCode() {
@@ -885,12 +830,10 @@ function gameLoop() {
             if (p2.eating > 0) p2.update(p1);
         }
         
-        // Send multiplayer updates (uncomment after deploying real server)
-        /*
+        // Send multiplayer updates (now active with real server!)
         if (gameState === "online" && socket) {
             sendGameUpdate();
         }
-        */
         
         // Check for winner
         if (p1.dead && !p2.winner) {
