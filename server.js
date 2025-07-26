@@ -121,6 +121,49 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle mouse spawning (only host should send this)
+    socket.on('mouseSpawned', (data) => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Send mouse spawn to guest
+            socket.to(roomCode).emit('mouseSpawned', {
+                fromRight: data.fromRight
+            });
+        }
+    });
+
+    // Handle mouse position updates (only host should send this)
+    socket.on('mouseUpdate', (data) => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Send mouse position to guest
+            socket.to(roomCode).emit('mouseUpdate', {
+                x: data.x,
+                y: data.y
+            });
+        }
+    });
+
+    // Handle mouse removal (only host should send this)
+    socket.on('mouseRemoved', () => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Send mouse removal to guest
+            socket.to(roomCode).emit('mouseRemoved');
+        }
+    });
+
+    // Handle when a player eats the mouse
+    socket.on('mouseEaten', (data) => {
+        const roomCode = socket.roomCode;
+        if (roomCode) {
+            // Notify the other player that someone ate the mouse
+            socket.to(roomCode).emit('mouseEaten', {
+                eaterRole: data.eaterRole
+            });
+        }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         console.log('Player disconnected:', socket.id);

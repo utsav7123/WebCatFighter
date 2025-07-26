@@ -194,6 +194,41 @@ function initializeRealMultiplayer() {
         }
     });
     
+    socket.on('mouseSpawned', (data) => {
+        // Guest receives mouse spawn from host
+        if (gameState === "online" && playerRole === 'guest') {
+            currentMouse = new Mouse(data.fromRight);
+        }
+    });
+    
+    socket.on('mouseUpdate', (data) => {
+        // Guest receives mouse position update from host
+        if (gameState === "online" && playerRole === 'guest' && currentMouse) {
+            currentMouse.rect.x = data.x;
+            currentMouse.rect.y = data.y;
+        }
+    });
+    
+    socket.on('mouseRemoved', () => {
+        // Guest receives mouse removal from host
+        if (gameState === "online" && playerRole === 'guest') {
+            if (currentMouse) {
+                stopSound('mice');
+                currentMouse = null;
+            }
+        }
+    });
+    
+    socket.on('mouseEaten', (data) => {
+        // Handle when opponent eats the mouse
+        if (gameState === "online") {
+            if (currentMouse) {
+                stopSound('mice');
+                currentMouse = null;
+            }
+        }
+    });
+    
     socket.on('playerDisconnected', () => {
         showRoomStatus('Other player disconnected', 'error');
         // Handle player disconnect (maybe return to menu)
@@ -951,22 +986,75 @@ function gameLoop() {
         }
         
         // Mouse spawning and updating
-        if (!currentMouse && !p1.eating && !p2.eating && !p1.winner && !p2.winner) {
-            if (Math.random() < CONFIG.MOUSE_SPAWN_CHANCE) {
-                currentMouse = new Mouse(Math.random() < 0.5);
+        if (gameState === "online") {
+            // In multiplayer, only host controls mouse spawning
+            if (playerRole === 'host' && !currentMouse && !p1.eating && !p2.eating && !p1.winner && !p2.winner) {
+                if (Math.random() < CONFIG.MOUSE_SPAWN_CHANCE) {
+                    const fromRight = Math.random() < 0.5;
+                    currentMouse = new Mouse(fromRight);
+                    // Send mouse spawn to guest
+                    if (socket) {
+                        socket.emit('mouseSpawned', { fromRight: fromRight });
+                    }
+                }
+            }
+        } else {
+            // Local gameplay - original logic
+            if (!currentMouse && !p1.eating && !p2.eating && !p1.winner && !p2.winner) {
+                if (Math.random() < CONFIG.MOUSE_SPAWN_CHANCE) {
+                    currentMouse = new Mouse(Math.random() < 0.5);
+                }
             }
         }
         
         if (currentMouse) {
             if (currentMouse.update()) {
                 currentMouse = null;
+                // In multiplayer, host notifies guest when mouse is removed
+                if (gameState === "online" && playerRole === 'host' && socket) {
+                    socket.emit('mouseRemoved');
+                }
             } else {
+                // Send mouse position update in multiplayer
+                if (gameState === "online" && playerRole === 'host' && socket) {
+                    socket.emit('mouseUpdate', {
+                        x: currentMouse.rect.x,
+                        y: currentMouse.rect.y
+                    });
+                }
+                
                 // Check collision with players
-                for (const player of [p1, p2]) {
-                    if (!player.eating && currentMouse && currentMouse.collidesWith(player)) {
-                        player.eatMouse();
+                if (gameState === "online") {
+                    // In multiplayer mode
+                    const myPlayer = playerRole === 'host' ? p1 : p2;
+                    const opponentPlayer = playerRole === 'host' ? p2 : p1;
+                    
+                    // Check if I (my player) ate the mouse
+                    if (!myPlayer.eating && currentMouse && currentMouse.collidesWith(myPlayer)) {
+                        myPlayer.eatMouse();
                         currentMouse = null;
-                        break; // Exit loop since mouse is eaten
+                        // Host notifies guest, or guest notifies host
+                        if (socket) {
+                            socket.emit('mouseEaten', { eaterRole: playerRole });
+                        }
+                        if (playerRole === 'host') {
+                            socket.emit('mouseRemoved');
+                        }
+                    }
+                    // Check if opponent ate the mouse (only for host, since guest gets updates)
+                    else if (playerRole === 'host' && !opponentPlayer.eating && currentMouse && currentMouse.collidesWith(opponentPlayer)) {
+                        opponentPlayer.eatMouse();
+                        currentMouse = null;
+                        socket.emit('mouseRemoved');
+                    }
+                } else {
+                    // Local gameplay - original logic
+                    for (const player of [p1, p2]) {
+                        if (!player.eating && currentMouse && currentMouse.collidesWith(player)) {
+                            player.eatMouse();
+                            currentMouse = null;
+                            break; // Exit loop since mouse is eaten
+                        }
                     }
                 }
             }
