@@ -742,7 +742,10 @@ function setupInput() {
     
     // Detect mobile device
     if (isMobile()) {
+        console.log('Mobile device detected - showing mobile controls');
         document.getElementById('mobileControls').style.display = 'flex';
+    } else {
+        console.log('Desktop device detected - hiding mobile controls');
     }
 }
 
@@ -773,16 +776,44 @@ function setupTouchControls() {
 }
 
 function handleTouchInput(action, pressed) {
-    const keyMappings = {
-        'left': 'KeyA',
-        'right': 'KeyD', 
-        'jump': 'KeyW',
-        'light': 'KeyR',
-        'heavy': 'KeyT'
-    };
+    let keyMappings;
     
-    if (keyMappings[action]) {
-        keys[keyMappings[action]] = pressed;
+    if (gameState === "online") {
+        // In multiplayer, map controls based on player role
+        if (playerRole === 'host') {
+            // Host controls Player 1 (p1)
+            keyMappings = {
+                'left': 'KeyA',
+                'right': 'KeyD', 
+                'jump': 'KeyW',
+                'light': 'KeyR',
+                'heavy': 'KeyT'
+            };
+        } else if (playerRole === 'guest') {
+            // Guest controls Player 2 (p2)
+            keyMappings = {
+                'left': 'ArrowLeft',
+                'right': 'ArrowRight', 
+                'jump': 'ArrowUp',
+                'light': 'Numpad1',
+                'heavy': 'Numpad2'
+            };
+        }
+    } else {
+        // Local games - default to Player 1 controls
+        keyMappings = {
+            'left': 'KeyA',
+            'right': 'KeyD', 
+            'jump': 'KeyW',
+            'light': 'KeyR',
+            'heavy': 'KeyT'
+        };
+    }
+    
+    if (keyMappings && keyMappings[action]) {
+        const keyCode = keyMappings[action];
+        keys[keyCode] = pressed;
+        console.log(`[${playerRole || 'local'}] Touch ${action} ${pressed ? 'pressed' : 'released'} -> ${keyCode}`);
     }
 }
 
